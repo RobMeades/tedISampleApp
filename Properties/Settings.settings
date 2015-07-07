@@ -1,0 +1,54 @@
+﻿<?xml version='1.0' encoding='utf-8'?>
+<SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="Teddy.Properties" GeneratedClassName="Settings">
+  <Profiles />
+  <Settings>
+    <Setting Name="Uuid" Type="System.String" Scope="User">
+      <Value Profile="(Default)">70644b30-8526-11e4-ba2f-eba61e7541e1</Value>
+    </Setting>
+    <Setting Name="TxCount" Type="System.Int64" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="BatterySizemWh" Type="System.Int64" Scope="User">
+      <Value Profile="(Default)">16000</Value>
+    </Setting>
+    <Setting Name="BitsPerTx" Type="System.Int64" Scope="User">
+      <Value Profile="(Default)">160</Value>
+    </Setting>
+    <Setting Name="TimePassedSeconds" Type="System.Int64" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="RxCount" Type="System.Int64" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="BitsTxCount" Type="System.Int64" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="BitsRxCount" Type="System.Int64" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="BitsPerRx" Type="System.Int64" Scope="User">
+      <Value Profile="(Default)">160</Value>
+    </Setting>
+    <Setting Name="BitsPerAck" Type="System.Int64" Scope="User">
+      <Value Profile="(Default)">160</Value>
+    </Setting>
+    <Setting Name="BitsProtocolOverhead" Type="System.Int64" Scope="User">
+      <Value Profile="(Default)">160</Value>
+    </Setting>
+    <Setting Name="TRxPerDay" Type="System.Int64" Scope="User">
+      <Value Profile="(Default)">4</Value>
+    </Setting>
+    <Setting Name="Username" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="Password" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="CsqValueAtRefdBm" Type="System.UInt32" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="Host" Type="System.String" Scope="User">
+      <Value Profile="(Default)">v2b.neul.com</Value>
+    </Setting>
+  </Settings>
+</SettingsFile>
