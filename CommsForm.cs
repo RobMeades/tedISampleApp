@@ -1042,6 +1042,27 @@ namespace Teddy
             }
         }
 
+        // Send TrafficReportGetReq
+        private void sendTrafficReportGetReqDlMsg()
+        {
+            unsafe
+            {
+                fixed (byte* pBuffer = &txDatagramBuffer[0])
+                {
+                    UInt32 bytesEncoded;
+                    Guid guid = new Guid(textBoxUuid.Text);
+
+                    bytesEncoded = messageCodec.encodeTrafficReportGetReqDlMsg(pBuffer);
+                    Array.Resize(ref txDatagramBuffer, (int)bytesEncoded);
+                    connection.Send(guid, uartEndpoint, txDatagramBuffer);
+                    datagramsSent++;
+                    testOnConsoleTrace(String.Format("Sent to endpoint {0} TrafficReportGetReq ({1} byte message) [{2}]: 0x{3}.", uartEndpoint, txDatagramBuffer.Length, datagramsSent, BitConverter.ToString(txDatagramBuffer)));
+                    updateDataAfterRx(bytesEncoded + 1); // +1 for endpoint byte
+                    Array.Resize(ref txDatagramBuffer, (int)messageCodec.maxDatagramSizeRaw());
+                }
+            }
+        }
+
         //
         // Function to process received messages.
         //
@@ -1105,7 +1126,7 @@ namespace Teddy
                                         testOnConsoleTrace(String.Format ("!!!!! tedI is at revision level {0} whereas this codec is revision {1}!!!!!", (int) revisionLevel, (int) messageCodec.revisionLevel()));
                                     }
 
-                                    /* Device has (re)started so sync with it's settings once more */
+                                    /* Device has (re)started so sync with it's settings */
                                     resetSettings();
                                     if (!parent.testMode)
                                     {
@@ -1246,6 +1267,30 @@ namespace Teddy
                                     {
                                         testOnConsoleTrace(String.Format("Pwr State: charging {0}, voltage {1} mV, energy {2} uAh.", powerStateChargeState, powerStateBatteryMV, powerStateEnergyUAH));
                                     }
+                                }
+                                break;
+                                case (MessageCodec_dll.CSDecodeResult.DECODE_RESULT_TRAFFIC_REPORT_GET_CNF_UL_MSG):
+                                {
+                                    UInt32 numDatagramsSent;
+                                    UInt32 numBytesSent;
+                                    UInt32 numDatagramsReceived;
+                                    UInt32 numBytesReceived;
+
+                                    decodeResult = messageCodec.decodeUlMsgTrafficReportGetCnf(ppNext, (UInt32)jsonMsg.Data.Length, &numDatagramsSent, &numBytesSent, &numDatagramsReceived, &numBytesReceived);
+                                    testOnConsoleTrace(String.Format("Message decode: TrafficReportGetCnfUlMsg, reporting {0} bytes sent ({1} datagrams), {2} bytes received ({3} datagrams).",
+                                                                     numBytesSent.ToString(), numDatagramsSent.ToString(), numBytesReceived.ToString(), numDatagramsReceived.ToString()));
+                                }
+                                break;
+                                case (MessageCodec_dll.CSDecodeResult.DECODE_RESULT_TRAFFIC_REPORT_IND_UL_MSG):
+                                {
+                                    UInt32 numDatagramsSent;
+                                    UInt32 numBytesSent;
+                                    UInt32 numDatagramsReceived;
+                                    UInt32 numBytesReceived;
+
+                                    decodeResult = messageCodec.decodeUlMsgTrafficReportInd(ppNext, (UInt32)jsonMsg.Data.Length, &numDatagramsSent, &numBytesSent, &numDatagramsReceived, &numBytesReceived);
+                                    testOnConsoleTrace(String.Format("Message decode: TrafficReportIndUlMsg, reporting {0} bytes sent ({1} datagrams), {2} bytes received ({3} datagrams).",
+                                                                     numBytesSent.ToString(), numDatagramsSent.ToString(), numBytesReceived.ToString(), numDatagramsReceived.ToString()));
                                 }
                                 break;
                                 case (MessageCodec_dll.CSDecodeResult.DECODE_RESULT_DEBUG_IND_UL_MSG):
