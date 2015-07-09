@@ -1204,7 +1204,7 @@ namespace Teddy
                                     Boolean powerStatePresent;
                                     UInt32 powerStateChargeState;
                                     UInt32 powerStateBatteryMV;
-                                    Int32 powerStateEnergyUAH;
+                                    UInt32 powerStateEnergyUWH;
 
                                     decodeResult = messageCodec.decodeUlMsgSensorsReportxxx(ppNext, (UInt32)jsonMsg.Data.Length,
                                                                                             &time,
@@ -1230,7 +1230,7 @@ namespace Teddy
                                                                                             &powerStatePresent,
                                                                                             &powerStateChargeState,
                                                                                             &powerStateBatteryMV,
-                                                                                            &powerStateEnergyUAH);
+                                                                                            &powerStateEnergyUWH);
                                     testOnConsoleTrace(String.Format("Message decode: SensorReportxxxMsg, contents..."));
                                     UInt32 hh = time / 3600;
                                     UInt32 mm = (time % 3600) / 60;
@@ -1265,7 +1265,7 @@ namespace Teddy
                                     }
                                     if (powerStatePresent)
                                     {
-                                        testOnConsoleTrace(String.Format("Pwr State: charging {0}, voltage {1} mV, energy {2} uAh.", powerStateChargeState, powerStateBatteryMV, powerStateEnergyUAH));
+                                        testOnConsoleTrace(String.Format("Pwr State: charging {0}, voltage {1} mV, energy {2} uWh.", powerStateChargeState, powerStateBatteryMV, powerStateEnergyUWH));
                                     }
                                 }
                                 break;
