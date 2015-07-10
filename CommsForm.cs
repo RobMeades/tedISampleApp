@@ -174,15 +174,7 @@ namespace Teddy
             {
                 // Enable printfs from dll to be displayed in IDE 
                 messageCodec.onConsoleTrace += new MessageCodec_dll.ConsoleTrace(testOnConsoleTrace);
-
-                Thread bindMessageCodecDllThread = new Thread(delegate()
-                {
-                    // Bind the DLL
-                    messageCodec.bindDll(@"Resources\\teddy_msg_codec.dll");
-                });
-                bindMessageCodecDllThread.Name = "bindMessageCodecDllThread";
-                bindMessageCodecDllThread.IsBackground = true;
-                bindMessageCodecDllThread.Start();
+                messageCodec.bindDll(@"Resources\\teddy_msg_codec.dll");
             }
 
             catch (Exception)
