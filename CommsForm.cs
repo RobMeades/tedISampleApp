@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using MessageCodec;
 using Neul.ServiceProvider;
+using System.Data;
 
 namespace Teddy
 {
@@ -28,11 +29,13 @@ namespace Teddy
         delegate void SetButtonEnabledCallback(Button button, Boolean onNotOff);
 
         // Declare functions to communicate with MainForm
-        public UpdateInt32Delegate UpdateRssiCallback;
+        public UpdateDataRowDelegate UpdateSensorDataCallback;
+        public UpdateDataRowDelegate UpdateTrafficDataCallback;
         public UpdateUInt32Delegate UpdateReportingIntervalCallback;
         public UpdateUInt32Delegate UpdateHeartbeatCallback;
         public UpdateBooleanDelegate UpdateConnectionCallback;
-        public UpdateVoidDelegate UpdatePollCallback;
+        public UpdateStringDelegate UpdateInitIndCallback;
+        public UpdateVoidDelegate UpdatePollIndCallback;
 
         // Neul connection stuff
         private Connection connection = null;
@@ -70,6 +73,8 @@ namespace Teddy
         private Int32 rssidBm = ((rssidBmMax - rssidBmMin) / 2) + rssidBmMin;
         private UInt32 datagramsSent = 0;
         private UInt32 datagramsReceived = 0;
+        private UInt64 powerUWHTotal = 0;
+        private UInt64 powerLastReportTime = 0;
 
         ///
         /// PUBLIC methods
@@ -110,10 +115,13 @@ namespace Teddy
             disconnectThread.RunWorkerCompleted += new RunWorkerCompletedEventHandler(disconnectThreadRunWorkerCompleted);
 
             // Hook in-delegates on parent form
-            this.UpdateRssiCallback += new UpdateInt32Delegate(parent._updateRssiCallback);
+            this.UpdateSensorDataCallback += new UpdateDataRowDelegate(parent._updateSensorDataCallback);
+            this.UpdateTrafficDataCallback += new UpdateDataRowDelegate(parent._updateTrafficDataCallback);
             this.UpdateReportingIntervalCallback += new UpdateUInt32Delegate(parent._updateReportingIntervalCallback);
             this.UpdateHeartbeatCallback += new UpdateUInt32Delegate(parent._updateHeartbeatCallback);
             this.UpdateConnectionCallback += new UpdateBooleanDelegate(parent._updateConnectionCallback);
+            this.UpdateInitIndCallback += new UpdateStringDelegate(parent._updateInitIndCallback);
+            this.UpdatePollIndCallback += new UpdateVoidDelegate(parent._updatePollIndCallback);
 
             messageCodecReady = false;
             uartEndpoint = 4;
@@ -678,11 +686,11 @@ namespace Teddy
                 updateControlText(this, commsFormTitleDisconnected);
                 connection = Connection.Create(textBoxHostname.Text, textBoxUsername.Text, textBoxPassword.Text);
                 testOnConsoleTrace(String.Format("Connecting to {0}...", textBoxHostname.Text));
-                testOnConsoleTrace("Purging old messages...");
+                // testOnConsoleTrace("Purging old messages...");
                 // Must do this _before_ opening the connection otherwise the DLL
                 // pulls all the messages down locally and the purge is pointless
-                connection.PurgeMessages();
-                testOnConsoleTrace("Purging completed, opening connection...");
+                // connection.PurgeMessages();
+                // testOnConsoleTrace("Purging completed, opening connection...");
                 connection.Open();
                 testOnConsoleTrace("Connection opened.");
 
@@ -1124,6 +1132,14 @@ namespace Teddy
                                     {
                                         sendIntervalsGetReqDlMsg();
                                     }
+
+                                    // Clear stored data
+                                    parent._clearSensorDataCallback();
+                                    parent._clearTrafficDataCallback();
+                                    powerLastReportTime = 0;
+
+                                    UpdateInitIndCallback(wakeUpCodeString(wakeUpCode));
+
                                     updateControlText(this, commsFormTitleSyncing);
                                 }
                                 break;
@@ -1168,6 +1184,7 @@ namespace Teddy
                                 {
                                     decodeResult = messageCodec.decodeUlMsgPollInd(ppNext, (UInt32)jsonMsg.Data.Length);
                                     testOnConsoleTrace(String.Format("Message decode: PollIndUlMsg."));
+                                    UpdatePollIndCallback();
                                 }
                                 break;
                                 case (MessageCodec_dll.CSDecodeResult.DECODE_RESULT_SENSORS_REPORT_GET_CNF_UL_MSG):
@@ -1198,6 +1215,9 @@ namespace Teddy
                                     UInt32 powerStateBatteryMV;
                                     UInt32 powerStateEnergyUWH;
 
+                                    // Add a new data point to the collection
+                                    DataRow newRow = parent.sensorDataTable.NewRow();
+
                                     decodeResult = messageCodec.decodeUlMsgSensorsReportxxx(ppNext, (UInt32)jsonMsg.Data.Length,
                                                                                             &time,
                                                                                             &gpsPositionPresent,
@@ -1224,41 +1244,81 @@ namespace Teddy
                                                                                             &powerStateBatteryMV,
                                                                                             &powerStateEnergyUWH);
                                     testOnConsoleTrace(String.Format("Message decode: SensorReportxxxMsg, contents..."));
+                                                                        
                                     UInt32 hh = time / 3600;
                                     UInt32 mm = (time % 3600) / 60;
                                     UInt32 ss = (time % 3600) % 60;
-                                    testOnConsoleTrace(String.Format("Time: {0} seconds, UTC {1:D2}:{2:D2}:{3:D2}.", time, hh, mm, ss));
+
+                                    newRow[parent.dataTableRowTimeName] = new DateTime(1970, 1, 1).ToLocalTime().AddSeconds(time);
+
+                                    testOnConsoleTrace(String.Format("Time: {0} seconds, UTC {1:D2}:{2:D2}:{3:D2}, date/time {4}.", time, hh, mm, ss, newRow[parent.dataTableRowTimeName]));
+                                    
                                     if (gpsPositionPresent)
                                     {
-                                        testOnConsoleTrace(String.Format("GPS: lat/long {0:N4}/{1:N4} degrees, elev {2} metres, speed {3} km/h.", Convert.ToDouble(gpsPositionLatitude) / 60000, Convert.ToDouble(gpsPositionLongitude) / 60000, gpsPositionElevation, gpsPositionSpeed));
+                                        newRow[parent.dataTableRowTimeName] = time;
+                                        newRow[parent.dataTableRowLatitudeName] = Convert.ToDouble(gpsPositionLatitude) / 60000;
+                                        newRow[parent.dataTableRowLongitudeName] = Convert.ToDouble(gpsPositionLongitude) / 60000;
+                                        newRow[parent.dataTableRowElevationName] = gpsPositionElevation;
+                                        newRow[parent.dataTableRowSpeedName] = gpsPositionSpeed;
+
+                                        testOnConsoleTrace(String.Format("GPS: lat/long {0:N4}/{1:N4} degrees, elev {2} metres, speed {3} km/h.",
+                                                           newRow[parent.dataTableRowLatitudeName], newRow[parent.dataTableRowLongitudeName],
+                                                           newRow[parent.dataTableRowElevationName], newRow[parent.dataTableRowSpeedName]));
                                     }
                                     if (lclPositionPresent)
                                     {
-                                        testOnConsoleTrace(String.Format("LCL: orientation {0}, hugs {1}, slaps {2}, drops {3}, nudges {4}.", lclPositionOrientation, lclPositionHugsThisPeriod, lclPositionSlapsThisPeriod, lclPositionDropsThisPeriod, lclPositionNudgesThisPeriod));
+                                        newRow[parent.dataTableRowOrientationName] = lclPositionOrientation;
+                                        newRow[parent.dataTableRowHugsName] = lclPositionHugsThisPeriod;
+                                        newRow[parent.dataTableRowSlapsName] = lclPositionSlapsThisPeriod;
+                                        newRow[parent.dataTableRowDropsName] = lclPositionDropsThisPeriod;
+                                        newRow[parent.dataTableRowNudgesName] = lclPositionNudgesThisPeriod;
+                                        testOnConsoleTrace(String.Format("LCL: orientation {0}, hugs {1}, slaps {2}, drops {3}, nudges {4}.",
+                                                           newRow[parent.dataTableRowOrientationName], newRow[parent.dataTableRowHugsName],
+                                                           newRow[parent.dataTableRowSlapsName], newRow[parent.dataTableRowDropsName],
+                                                           newRow[parent.dataTableRowNudgesName]));
                                     }
                                     if (soundLevelPresent)
                                     {
-                                        testOnConsoleTrace(String.Format("Sound: {0}.", soundLevel));
+                                        newRow[parent.dataTableRowSoundLevelName] = soundLevel;
+                                        testOnConsoleTrace(String.Format("Sound: {0}.", newRow[parent.dataTableRowSoundLevelName]));
                                     }
                                     if (luminosityPresent)
                                     {
-                                        testOnConsoleTrace(String.Format("Luminosity: {0}.", luminosity));
+                                        newRow[parent.dataTableRowLuminosityName] = luminosity;
+                                        testOnConsoleTrace(String.Format("Luminosity: {0}.", newRow[parent.dataTableRowLuminosityName]));
                                     }
                                     if (temperaturePresent)
                                     {
-                                        testOnConsoleTrace(String.Format("Temperature: {0} C.", temperature));
+                                        newRow[parent.dataTableRowTemperatureName] = temperature;
+                                        testOnConsoleTrace(String.Format("Temperature: {0} C.", newRow[parent.dataTableRowTemperatureName]));
                                     }
                                     if (rssiPresent)
                                     {
-                                        testOnConsoleTrace(String.Format("RSSI: {0}.", rssi));
+                                        newRow[parent.dataTableRowRssiName] = rssi;
                                         rssidBm = inventRssi(rssi);
-                                        updateControlText(textBoxRssi, rssidBm.ToString());
-                                        UpdateRssiCallback(rssidBm);
+                                        newRow[parent.dataTableRowRssidBmName] = rssidBm;
+                                        testOnConsoleTrace(String.Format("RSSI: {0}, {1} dBm.", newRow[parent.dataTableRowRssiName], newRow[parent.dataTableRowRssidBmName]));
                                     }
                                     if (powerStatePresent)
                                     {
-                                        testOnConsoleTrace(String.Format("Pwr State: charging {0}, voltage {1} mV, energy {2} uWh.", powerStateChargeState, powerStateBatteryMV, powerStateEnergyUWH));
+                                        newRow[parent.dataTableRowChargeStateName] = powerStateChargeState;
+                                        newRow[parent.dataTableRowBatterymVName] = powerStateBatteryMV;
+                                        newRow[parent.dataTableRowEnergyuWhName] = powerStateEnergyUWH;
+                                        if (powerLastReportTime > 0)
+                                        {
+                                            newRow[parent.dataTableRowEnergymWPerHourName] = (double)powerStateEnergyUWH * 3600 / (double)(time - powerLastReportTime) / 1000;
+                                        }
+                                        powerLastReportTime = time;
+                                        powerUWHTotal += powerStateEnergyUWH;
+                                        newRow[parent.dataTableRowEnergyTotalmWhName] = powerUWHTotal / 1000;
+                                        testOnConsoleTrace(String.Format("Pwr State: charging {0}, voltage {1} mV, energy {2} uWh, mW in an hour {3}, total since reset {4} uWh.",
+                                                           newRow[parent.dataTableRowChargeStateName], newRow[parent.dataTableRowBatterymVName],
+                                                           newRow[parent.dataTableRowEnergyuWhName], newRow[parent.dataTableRowEnergymWPerHourName],
+                                                           newRow[parent.dataTableRowEnergyTotalmWhName]));
                                     }
+
+                                    // Update the data table
+                                    UpdateSensorDataCallback(newRow);
                                 }
                                 break;
                                 case (MessageCodec_dll.CSDecodeResult.DECODE_RESULT_TRAFFIC_REPORT_GET_CNF_UL_MSG):
@@ -1268,9 +1328,20 @@ namespace Teddy
                                     UInt32 numDatagramsReceived;
                                     UInt32 numBytesReceived;
 
+                                    // Add a new data point to the collection
+                                    DataRow newRow = parent.trafficDataTable.NewRow();
+
                                     decodeResult = messageCodec.decodeUlMsgTrafficReportGetCnf(ppNext, (UInt32)jsonMsg.Data.Length, &numDatagramsSent, &numBytesSent, &numDatagramsReceived, &numBytesReceived);
+                                    newRow[parent.dataTableRowUplinkDatagramsName] = numDatagramsSent;
+                                    newRow[parent.dataTableRowUplinkBytesName] = numBytesSent;
+                                    newRow[parent.dataTableRowDownlinkDatagramsName] = numDatagramsReceived;
+                                    newRow[parent.dataTableRowDownlinkBytesName] = numBytesReceived;
+
                                     testOnConsoleTrace(String.Format("Message decode: TrafficReportGetCnfUlMsg, reporting {0} bytes sent ({1} datagrams), {2} bytes received ({3} datagrams).",
-                                                                     numBytesSent.ToString(), numDatagramsSent.ToString(), numBytesReceived.ToString(), numDatagramsReceived.ToString()));
+                                                                     newRow[parent.dataTableRowUplinkBytesName].ToString(), newRow[parent.dataTableRowUplinkDatagramsName].ToString(),
+                                                                     newRow[parent.dataTableRowDownlinkBytesName].ToString(), newRow[parent.dataTableRowDownlinkDatagramsName].ToString()));
+                                    // Update the data table
+                                    UpdateTrafficDataCallback(newRow);
                                 }
                                 break;
                                 case (MessageCodec_dll.CSDecodeResult.DECODE_RESULT_TRAFFIC_REPORT_IND_UL_MSG):
@@ -1280,9 +1351,20 @@ namespace Teddy
                                     UInt32 numDatagramsReceived;
                                     UInt32 numBytesReceived;
 
+                                    // Add a new data point to the collection
+                                    DataRow newRow = parent.trafficDataTable.NewRow();
+
                                     decodeResult = messageCodec.decodeUlMsgTrafficReportInd(ppNext, (UInt32)jsonMsg.Data.Length, &numDatagramsSent, &numBytesSent, &numDatagramsReceived, &numBytesReceived);
+                                    newRow[parent.dataTableRowUplinkDatagramsName] = numDatagramsSent;
+                                    newRow[parent.dataTableRowUplinkBytesName] = numBytesSent;
+                                    newRow[parent.dataTableRowDownlinkDatagramsName] = numDatagramsReceived;
+                                    newRow[parent.dataTableRowDownlinkBytesName] = numBytesReceived;
+
                                     testOnConsoleTrace(String.Format("Message decode: TrafficReportIndUlMsg, reporting {0} bytes sent ({1} datagrams), {2} bytes received ({3} datagrams).",
-                                                                     numBytesSent.ToString(), numDatagramsSent.ToString(), numBytesReceived.ToString(), numDatagramsReceived.ToString()));
+                                                                     newRow[parent.dataTableRowUplinkBytesName].ToString(), newRow[parent.dataTableRowUplinkDatagramsName].ToString(),
+                                                                     newRow[parent.dataTableRowDownlinkBytesName].ToString(), newRow[parent.dataTableRowDownlinkDatagramsName].ToString()));
+                                    // Update the data table
+                                    UpdateTrafficDataCallback(newRow);
                                 }
                                 break;
                                 case (MessageCodec_dll.CSDecodeResult.DECODE_RESULT_DEBUG_IND_UL_MSG):
@@ -1347,6 +1429,44 @@ namespace Teddy
             {
                 updateControlText (this, commsFormTitleConnected);
             }
+        }
+
+        // Return a wakeup string from a code
+        private String wakeUpCodeString(UInt32 wakeUpCode)
+        {
+            String str = wakeUpCode.ToString();
+            switch (wakeUpCode)
+            {
+                case 0:
+                    str += " (normal)";
+                break;
+                case 1:
+                    str += " (watchdog timeout?)";
+                break;
+                case 2:
+                    str += " (AT command problem?)";
+                break;
+                case 3:
+                    str += " (network send problem?)";
+                break;
+                case 4:
+                    str += " (memory allocation problem?)";
+                break;
+                case 5:
+                    str += " (protocol problem?)";
+                break;
+                case 6:
+                    str += " (generic failure?)";
+                break;
+                case 7:
+                    str += " (commanded reboot?)";
+                break;
+                default:
+                    str += " (unknown)";
+                break;
+            }
+
+            return str;
         }
 
         // Create an RSSI value
@@ -1460,7 +1580,7 @@ namespace Teddy
         }
 
         //
-        // Functions to energy consumed
+        // Functions to work out energy consumed
         //
 
         // Update stored data after a Tx

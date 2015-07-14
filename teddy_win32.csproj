@@ -137,7 +137,6 @@
     <None Include="app.config">
       <SubType>Designer</SubType>
     </None>
-    <None Include="Properties\DataSources\EnergyData.datasource" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Properties\Settings.settings">
@@ -146,6 +145,8 @@
     </None>
     <None Include="Resources\phoca_thumb_l_u-blox_logo_rgb_white_transparent_white.png" />
     <None Include="Resources\phoca_thumb_l_u-blox_logo_rgb_white_transparent_black.png" />
+    <None Include="Resources\tedI_logo.jpg" />
+    <None Include="Resources\tedI_logo_transparent.png" />
     <Content Include="u-blox_icon.ico" />
     <None Include="Resources\neul_logo.png" />
   </ItemGroup>
@@ -173,6 +174,9 @@
     <Content Include="Resources\teddy_msg_codec.dll">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Properties\DataSources\" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
