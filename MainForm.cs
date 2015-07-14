@@ -70,6 +70,7 @@ namespace Teddy
         // Variables to do with projected energy data
         public DataTable energyTable = null;
         public static readonly string energyDataFilename = "teddy_energy_data.xml";
+        public static readonly double energyIdleWh = 0.01 * 12;
 
         // Data storage items
         public DataTable sensorDataTable = null;
@@ -548,6 +549,26 @@ namespace Teddy
             commsForm.WindowState = FormWindowState.Normal;
         }
 
+        // Update the totals label
+        private void updateTotals()
+        {
+            string text;
+
+            if ((sensorDataTable.Rows.Count > 0 &&
+                 sensorDataTable.Rows[sensorDataTable.Rows.Count - 1][dataTableRowEnergyTotalmWhName] != DBNull.Value) &&
+                (trafficDataTable.Rows.Count > 0 &&
+                 trafficDataTable.Rows[trafficDataTable.Rows.Count - 1][dataTableRowUplinkBytesName] != DBNull.Value &&
+                 trafficDataTable.Rows[trafficDataTable.Rows.Count - 1][dataTableRowDownlinkBytesName] != DBNull.Value))
+            {
+                double energyWh = Convert.ToDouble(sensorDataTable.Rows[sensorDataTable.Rows.Count - 1][dataTableRowEnergyTotalmWhName]) / 1000;
+                text = String.Format("Energy consumed: {0:N3} Wh ({1:N3} active), total bytes Tx {2}, total bytes Rx {3}.",
+                                     energyWh, energyWh - energyIdleWh,
+                                     trafficDataTable.Rows[trafficDataTable.Rows.Count - 1][dataTableRowUplinkBytesName],
+                                     trafficDataTable.Rows[trafficDataTable.Rows.Count - 1][dataTableRowDownlinkBytesName]);
+                updateControlText(labelTotals, text);
+            }
+        }
+
         ///
         ///  Methods to allow values to be updated on this form based
         ///  on the comms conducted by the CommsForm.
@@ -587,6 +608,7 @@ namespace Teddy
             if (value[dataTableRowBatterymVName] != DBNull.Value && value[dataTableRowEnergymWPerHourName] != DBNull.Value)
             {
                 updateRefreshChart(chartPower);
+                updateTotals();
             }
             if (value[dataTableRowTemperatureName] != DBNull.Value)
             {
@@ -609,6 +631,7 @@ namespace Teddy
             trafficDataTable.WriteXml(trafficDataTableFilename);
 
             updateRefreshChart(chartTraffic);
+            updateTotals();
         }
 
         // Clear the sensor data
@@ -661,7 +684,7 @@ namespace Teddy
         // Update when an InitInd occurs
         public void _updateInitIndCallback(String str)
         {
-            updateControlText(labelInitInd, String.Format("Last InitInd @ {0:D2}:{1:D2}:{2:D2}, reason \"{3}\".",
+            updateControlText(labelInitInd, String.Format("Last InitInd @ {0:D2}:{1:D2}:{2:D2}, wakeup code {3}.",
                                                            DateTime.UtcNow.ToLocalTime().Hour, DateTime.UtcNow.ToLocalTime().Minute, DateTime.UtcNow.ToLocalTime().Second, str));
         }
 

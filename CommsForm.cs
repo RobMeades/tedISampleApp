@@ -1255,7 +1255,6 @@ namespace Teddy
                                     
                                     if (gpsPositionPresent)
                                     {
-                                        newRow[parent.dataTableRowTimeName] = time;
                                         newRow[parent.dataTableRowLatitudeName] = Convert.ToDouble(gpsPositionLatitude) / 60000;
                                         newRow[parent.dataTableRowLongitudeName] = Convert.ToDouble(gpsPositionLongitude) / 60000;
                                         newRow[parent.dataTableRowElevationName] = gpsPositionElevation;
